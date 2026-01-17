@@ -96,7 +96,7 @@ export default function ProcessDetailScreen() {
     return Colors.error;
   };
 
-  const errorCount = currentProcess.validationIssues.filter(i => i.severity === 'error').length;
+  const errorCount = currentProcess.validationIssues?.filter(i => i.severity === 'error').length || 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>

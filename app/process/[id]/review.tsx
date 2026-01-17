@@ -27,9 +27,9 @@ export default function ReviewScreen() {
     );
   }
 
-  const errors = currentProcess.validationIssues.filter(i => i.severity === 'error');
-  const warnings = currentProcess.validationIssues.filter(i => i.severity === 'warning');
-  const infos = currentProcess.validationIssues.filter(i => i.severity === 'info');
+  const errors = currentProcess.validationIssues?.filter(i => i.severity === 'error') || [];
+  const warnings = currentProcess.validationIssues?.filter(i => i.severity === 'warning') || [];
+  const infos = currentProcess.validationIssues?.filter(i => i.severity === 'info') || [];
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return Colors.success;

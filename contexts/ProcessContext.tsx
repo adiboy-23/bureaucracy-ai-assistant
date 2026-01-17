@@ -1,6 +1,6 @@
 import createContextHook from '@nkzw/create-context-hook';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { Process, FormField, ProcessDocument, ValidationIssue } from '@/types/process';
 
 const STORAGE_KEY = 'processes_data';
@@ -10,19 +10,58 @@ export const [ProcessProvider, useProcess] = createContextHook(() => {
   const [currentProcess, setCurrentProcess] = useState<Process | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadProcesses = async () => {
+  const migrateProcess = useCallback((process: any): Process => {
+    return {
+      ...process,
+      validationIssues: process.validationIssues || [],
+      checklistItems: process.checklistItems || [
+        { id: '1', title: 'Describe your situation', completed: false, required: true },
+        { id: '2', title: 'Upload required documents', completed: false, required: true },
+        { id: '3', title: 'Complete form fields', completed: false, required: true },
+        { id: '4', title: 'Review and validate', completed: false, required: true },
+      ],
+      workflowGraph: process.workflowGraph || [
+        { id: 'node-1', type: 'question', label: 'Initial consultation', completed: false, required: true },
+        { id: 'node-2', type: 'document', label: 'Document upload', completed: false, required: true, dependsOn: ['node-1'] },
+        { id: 'node-3', type: 'field', label: 'Form completion', completed: false, required: true, dependsOn: ['node-2'] },
+        { id: 'node-4', type: 'validation', label: 'Final validation', completed: false, required: true, dependsOn: ['node-3'] },
+      ],
+      persona: process.persona || {
+        type: 'self',
+        name: 'Self',
+        authorized: true,
+      },
+      explainWhyLog: process.explainWhyLog || [],
+      riskFlags: process.riskFlags || [],
+      impactMetrics: process.impactMetrics || {
+        estimatedTimeSavedHours: 0,
+        errorReductionPercent: 0,
+        estimatedCostSaved: 0,
+        comparisonToManual: 'Calculating...',
+      },
+      dataExpiry: process.dataExpiry || {
+        enabled: false,
+      },
+      voiceEnabled: process.voiceEnabled || false,
+      fields: process.fields || [],
+      documents: process.documents || [],
+    };
+  }, []);
+
+  const loadProcesses = useCallback(async () => {
     try {
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
       if (stored) {
         const data = JSON.parse(stored);
-        setProcesses(data);
+        const migratedData = data.map((p: any) => migrateProcess(p));
+        setProcesses(migratedData);
       }
     } catch (error) {
       console.error('Failed to load processes:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [migrateProcess]);
 
   const saveProcesses = async (data: Process[]) => {
     try {
@@ -34,7 +73,7 @@ export const [ProcessProvider, useProcess] = createContextHook(() => {
 
   useEffect(() => {
     loadProcesses();
-  }, []);
+  }, [loadProcesses]);
 
   useEffect(() => {
     if (!isLoading) {

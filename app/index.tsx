@@ -88,7 +88,7 @@ export default function HomeScreen() {
                   <Text style={styles.processDate}>
                     Updated {new Date(process.updatedAt).toLocaleDateString()}
                   </Text>
-                  {process.validationIssues.length > 0 && (
+                  {process.validationIssues && process.validationIssues.length > 0 && (
                     <View style={styles.issuesBadge}>
                       <AlertCircle size={12} color={Colors.error} />
                       <Text style={styles.issuesText}>
