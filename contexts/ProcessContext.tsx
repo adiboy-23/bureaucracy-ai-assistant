@@ -61,6 +61,29 @@ export const [ProcessProvider, useProcess] = createContextHook(() => {
         { id: '3', title: 'Complete form fields', completed: false, required: true },
         { id: '4', title: 'Review and validate', completed: false, required: true },
       ],
+      workflowGraph: [
+        { id: 'node-1', type: 'question', label: 'Initial consultation', completed: false, required: true },
+        { id: 'node-2', type: 'document', label: 'Document upload', completed: false, required: true, dependsOn: ['node-1'] },
+        { id: 'node-3', type: 'field', label: 'Form completion', completed: false, required: true, dependsOn: ['node-2'] },
+        { id: 'node-4', type: 'validation', label: 'Final validation', completed: false, required: true, dependsOn: ['node-3'] },
+      ],
+      persona: {
+        type: 'self',
+        name: 'Self',
+        authorized: true,
+      },
+      explainWhyLog: [],
+      riskFlags: [],
+      impactMetrics: {
+        estimatedTimeSavedHours: 0,
+        errorReductionPercent: 0,
+        estimatedCostSaved: 0,
+        comparisonToManual: 'Calculating...',
+      },
+      dataExpiry: {
+        enabled: false,
+      },
+      voiceEnabled: false,
     };
     setProcesses([newProcess, ...processes]);
     setCurrentProcess(newProcess);
@@ -119,6 +142,7 @@ export const [ProcessProvider, useProcess] = createContextHook(() => {
       if (!process) return prev;
 
       const issues: ValidationIssue[] = [];
+      const riskFlags: typeof process.riskFlags = [];
 
       process.fields.forEach(field => {
         if (field.required && !field.value.trim()) {
@@ -128,6 +152,8 @@ export const [ProcessProvider, useProcess] = createContextHook(() => {
             severity: 'error',
             message: `${field.label} is required`,
             suggestion: 'Please fill in this field',
+            ruleSource: 'Form validation rules',
+            confidence: 1.0,
           });
         }
 
@@ -140,6 +166,8 @@ export const [ProcessProvider, useProcess] = createContextHook(() => {
               severity: 'error',
               message: `${field.label} has invalid date format`,
               suggestion: 'Please enter a valid date',
+              ruleSource: 'Date format validation',
+              confidence: 1.0,
             });
           }
         }
@@ -152,8 +180,21 @@ export const [ProcessProvider, useProcess] = createContextHook(() => {
               severity: 'error',
               message: `${field.label} must be a valid number`,
               suggestion: 'Please enter a numeric value',
+              ruleSource: 'Number format validation',
+              confidence: 1.0,
             });
           }
+        }
+
+        if (field.confidence && field.confidence < 0.7) {
+          riskFlags.push({
+            id: `${field.id}-low-confidence`,
+            category: 'ai_confidence',
+            severity: 'medium',
+            message: `AI is less confident about "${field.label}"`,
+            explanation: `The AI extracted this field with ${Math.round(field.confidence * 100)}% confidence. Please verify the information.`,
+            aiConfidence: field.confidence,
+          });
         }
       });
 
@@ -163,37 +204,66 @@ export const [ProcessProvider, useProcess] = createContextHook(() => {
           severity: 'warning',
           message: 'No documents uploaded',
           suggestion: 'Upload supporting documents to strengthen your application',
+          ruleSource: 'Document requirements',
+          confidence: 1.0,
+        });
+        riskFlags.push({
+          id: 'no-documents-risk',
+          category: 'missing_data',
+          severity: 'high',
+          message: 'Missing supporting documents',
+          explanation: 'Without documents, the application may be incomplete or rejected.',
         });
       }
 
-      let score = 0;
-      let maxScore = 0;
+      const completedNodes = process.workflowGraph.filter(n => n.completed).length;
+      const totalNodes = process.workflowGraph.length;
+      const graphCompletion = totalNodes > 0 ? completedNodes / totalNodes : 0;
 
-      process.fields.forEach(field => {
-        maxScore += field.required ? 20 : 10;
-        if (field.value.trim()) {
-          score += field.required ? 20 : 10;
-        }
-      });
+      const requiredFields = process.fields.filter(f => f.required);
+      const filledRequiredFields = requiredFields.filter(f => f.value.trim());
+      const fieldCompletion = requiredFields.length > 0 ? filledRequiredFields.length / requiredFields.length : 0;
+
+      const documentScore = process.documents.length > 0 ? 1.0 : 0.3;
 
       const errors = issues.filter(i => i.severity === 'error').length;
       const warnings = issues.filter(i => i.severity === 'warning').length;
 
-      if (maxScore > 0) {
-        score = Math.round((score / maxScore) * 100);
-      } else {
-        score = process.documents.length > 0 ? 50 : 0;
+      const errorPenalty = errors * 15;
+      const warningPenalty = warnings * 5;
+
+      const baseScore = (
+        (graphCompletion * 30) +
+        (fieldCompletion * 50) +
+        (documentScore * 20)
+      );
+
+      let score = Math.round(Math.max(0, baseScore - errorPenalty - warningPenalty));
+
+      if (riskFlags.length > 0) {
+        const highRisks = riskFlags.filter(r => r.severity === 'high').length;
+        const mediumRisks = riskFlags.filter(r => r.severity === 'medium').length;
+        score = Math.max(0, score - (highRisks * 10) - (mediumRisks * 5));
       }
 
-      score = Math.max(0, score - (errors * 10) - (warnings * 5));
+      if (process.persona.type !== 'self' && !process.persona.authorized) {
+        riskFlags.push({
+          id: 'unauthorized-persona',
+          category: 'policy',
+          severity: 'high',
+          message: 'Authorization may be required',
+          explanation: `Acting as ${process.persona.type} may require legal authorization or documentation.`,
+        });
+        score = Math.max(0, score - 10);
+      }
 
       const updated = prev.map(p => p.id === processId 
-        ? { ...p, validationIssues: issues, readinessScore: score, updatedAt: new Date().toISOString() }
+        ? { ...p, validationIssues: issues, riskFlags, readinessScore: score, updatedAt: new Date().toISOString() }
         : p
       );
       
       if (currentProcess?.id === processId) {
-        setCurrentProcess(prev => prev ? { ...prev, validationIssues: issues, readinessScore: score, updatedAt: new Date().toISOString() } : null);
+        setCurrentProcess(prev => prev ? { ...prev, validationIssues: issues, riskFlags, readinessScore: score, updatedAt: new Date().toISOString() } : null);
       }
       
       return updated;

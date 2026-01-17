@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
-import { Send } from 'lucide-react-native';
+import { Send, HelpCircle } from 'lucide-react-native';
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,18 +7,19 @@ import { useRorkAgent, createRorkTool } from '@rork-ai/toolkit-sdk';
 import { z } from 'zod';
 import Colors from '@/constants/colors';
 import { useProcess } from '@/contexts/ProcessContext';
-import type { FormField } from '@/types/process';
+import type { FormField, ExplainWhy } from '@/types/process';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { addFields, completeChecklistItem } = useProcess();
+  const { addFields, completeChecklistItem, updateProcess, currentProcess } = useProcess();
   const [input, setInput] = useState('');
+  const [showExplainWhy, setShowExplainWhy] = useState<ExplainWhy | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
 
   const { messages, sendMessage } = useRorkAgent({
     tools: {
       generateFormFields: createRorkTool({
-        description: 'Generate form fields based on the user situation and requirements',
+        description: 'Generate form fields based on the user situation and requirements. Use smart questioning to only ask for missing information.',
         zodSchema: z.object({
           fields: z.array(z.object({
             id: z.string().describe('Unique field identifier'),
@@ -27,7 +28,10 @@ export default function ChatScreen() {
             type: z.enum(['text', 'date', 'number', 'select', 'multiline']).describe('Field input type'),
             required: z.boolean().describe('Whether field is required'),
             options: z.array(z.string()).optional().describe('Options for select fields'),
+            confidence: z.number().optional().describe('AI confidence level 0-1'),
+            explanation: z.string().optional().describe('Why this field is needed'),
           })),
+          reasoning: z.string().describe('Explanation of why these specific fields are needed'),
         }),
         execute(input) {
           console.log('Generating fields:', input.fields);
@@ -38,7 +42,28 @@ export default function ChatScreen() {
           }));
           addFields(id, formFields);
           completeChecklistItem(id, '1');
-          return 'Form fields created successfully';
+          
+          const explainWhy: ExplainWhy = {
+            triggerId: `field-generation-${Date.now()}`,
+            reason: input.reasoning,
+            ruleSource: 'Form requirements analysis',
+            confidence: 0.85,
+            timestamp: new Date().toISOString(),
+          };
+          
+          if (currentProcess) {
+            updateProcess(id, {
+              explainWhyLog: [...currentProcess.explainWhyLog, explainWhy],
+              impactMetrics: {
+                ...currentProcess.impactMetrics,
+                estimatedTimeSavedHours: 3.5,
+                errorReductionPercent: 75,
+                estimatedCostSaved: 250,
+              },
+            });
+          }
+          
+          return `Created ${formFields.length} form fields. ${input.reasoning}`;
         },
       }),
     },
@@ -109,15 +134,30 @@ export default function ChatScreen() {
                   if (part.state === 'input-streaming' || part.state === 'input-available') {
                     return (
                       <View key={`${m.id}-${i}`} style={styles.toolBubble}>
-                        <Text style={styles.toolText}>🔧 Creating form fields...</Text>
+                        <Text style={styles.toolText}>🔧 Analyzing your situation and creating form fields...</Text>
                       </View>
                     );
                   }
                   
                   if (part.state === 'output-available') {
                     return (
-                      <View key={`${m.id}-${i}`} style={styles.toolBubble}>
-                        <Text style={styles.toolText}>✅ Form fields created! Continue to the next step.</Text>
+                      <View key={`${m.id}-${i}`}>
+                        <View style={styles.toolBubble}>
+                          <Text style={styles.toolText}>✅ Form fields created! Continue to the next step.</Text>
+                        </View>
+                        <TouchableOpacity 
+                          style={styles.explainWhyButton}
+                          onPress={() => {
+                            if (currentProcess && currentProcess.explainWhyLog.length > 0) {
+                              const latestExplain = currentProcess.explainWhyLog[currentProcess.explainWhyLog.length - 1];
+                              setShowExplainWhy(latestExplain);
+                            }
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <HelpCircle size={14} color={Colors.primary} />
+                          <Text style={styles.explainWhyText}>Why did AI ask these questions?</Text>
+                        </TouchableOpacity>
                       </View>
                     );
                   }
@@ -136,6 +176,26 @@ export default function ChatScreen() {
             </View>
           ))}
         </ScrollView>
+
+        {showExplainWhy && (
+          <View style={styles.explainWhyModal}>
+            <View style={styles.explainWhyContent}>
+              <View style={styles.explainWhyHeader}>
+                <Text style={styles.explainWhyTitle}>Why AI Asked This</Text>
+                <TouchableOpacity onPress={() => setShowExplainWhy(null)}>
+                  <Text style={styles.explainWhyClose}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.explainWhyReason}>{showExplainWhy.reason}</Text>
+              <View style={styles.explainWhyMeta}>
+                <Text style={styles.explainWhyMetaText}>Source: {showExplainWhy.ruleSource}</Text>
+                <Text style={styles.explainWhyMetaText}>
+                  Confidence: {Math.round(showExplainWhy.confidence * 100)}%
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
 
         <View style={styles.inputContainer}>
           <TextInput
@@ -254,6 +314,68 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.error,
     fontWeight: '500',
+  },
+  explainWhyButton: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  explainWhyText: {
+    fontSize: 12,
+    color: Colors.primary,
+    fontWeight: '500',
+  },
+  explainWhyModal: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  explainWhyContent: {
+    backgroundColor: Colors.cardBackground,
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
+  },
+  explainWhyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  explainWhyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
+  explainWhyClose: {
+    fontSize: 24,
+    color: Colors.text.muted,
+  },
+  explainWhyReason: {
+    fontSize: 14,
+    color: Colors.text.primary,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  explainWhyMeta: {
+    gap: 4,
+  },
+  explainWhyMetaText: {
+    fontSize: 12,
+    color: Colors.text.secondary,
   },
   inputContainer: {
     flexDirection: 'row',

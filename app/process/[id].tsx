@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { MessageSquare, FileUp, FileText, CheckCircle2, ChevronRight, AlertCircle } from 'lucide-react-native';
+import { MessageSquare, FileUp, FileText, CheckCircle2, ChevronRight, AlertCircle, GitBranch, TrendingUp, Settings as SettingsIcon } from 'lucide-react-native';
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -63,6 +63,33 @@ export default function ProcessDetailScreen() {
     },
   ];
 
+  const advancedFeatures = [
+    {
+      id: 'workflow',
+      title: 'Workflow Graph',
+      subtitle: 'View process flow and dependencies',
+      icon: GitBranch,
+      route: `/process/${id}/workflow`,
+      color: '#3B82F6',
+    },
+    {
+      id: 'impact',
+      title: 'Impact Dashboard',
+      subtitle: 'Time and cost savings analysis',
+      icon: TrendingUp,
+      route: `/process/${id}/impact`,
+      color: '#F59E0B',
+    },
+    {
+      id: 'settings',
+      title: 'Process Settings',
+      subtitle: 'Persona, privacy, and preferences',
+      icon: SettingsIcon,
+      route: `/process/${id}/settings`,
+      color: '#8B5CF6',
+    },
+  ];
+
   const getScoreColor = (score: number) => {
     if (score >= 80) return Colors.success;
     if (score >= 50) return Colors.warning;
@@ -121,7 +148,7 @@ export default function ProcessDetailScreen() {
 
         <View style={styles.stepsSection}>
           <Text style={styles.sectionTitle}>Steps</Text>
-          {steps.map((step, index) => {
+          {steps.map((step) => {
             const Icon = step.icon;
             return (
               <TouchableOpacity
@@ -140,6 +167,32 @@ export default function ProcessDetailScreen() {
                   <View style={styles.stepInfo}>
                     <Text style={styles.stepTitle}>{step.title}</Text>
                     <Text style={styles.stepSubtitle}>{step.subtitle}</Text>
+                  </View>
+                </View>
+                <ChevronRight size={20} color={Colors.text.muted} />
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <View style={styles.advancedSection}>
+          <Text style={styles.sectionTitle}>Advanced Features</Text>
+          {advancedFeatures.map((feature) => {
+            const Icon = feature.icon;
+            return (
+              <TouchableOpacity
+                key={feature.id}
+                style={styles.featureCard}
+                onPress={() => router.push(feature.route as never)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.featureLeft}>
+                  <View style={[styles.featureIconContainer, { backgroundColor: `${feature.color}20` }]}>
+                    <Icon size={20} color={feature.color} />
+                  </View>
+                  <View style={styles.featureInfo}>
+                    <Text style={styles.featureTitle}>{feature.title}</Text>
+                    <Text style={styles.featureSubtitle}>{feature.subtitle}</Text>
                   </View>
                 </View>
                 <ChevronRight size={20} color={Colors.text.muted} />
@@ -301,6 +354,47 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
   },
   stepSubtitle: {
+    fontSize: 13,
+    color: Colors.text.secondary,
+  },
+  advancedSection: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  featureCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.cardBackground,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  featureLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  featureIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  featureInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  featureTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
+  featureSubtitle: {
     fontSize: 13,
     color: Colors.text.secondary,
   },

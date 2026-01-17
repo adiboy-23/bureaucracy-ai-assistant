@@ -15,8 +15,7 @@ export default function ReviewScreen() {
     if (currentProcess && currentProcess.id === id) {
       validateProcess(id);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentProcess, id, validateProcess]);
 
   if (!currentProcess || currentProcess.id !== id) {
     return (
@@ -58,7 +57,7 @@ export default function ReviewScreen() {
           onPress: () => {
             updateProcess(id, { status: 'ready' });
             completeChecklistItem(id, '4');
-            router.push('/');
+            router.replace('/');
           },
         },
       ]
@@ -207,6 +206,43 @@ export default function ReviewScreen() {
             <Text style={styles.successText}>
               Your form has been validated and is ready for submission.
             </Text>
+          </View>
+        )}
+
+        {currentProcess.riskFlags && currentProcess.riskFlags.length > 0 && (
+          <View style={styles.riskSection}>
+            <Text style={styles.sectionTitle}>Risk & Compliance Alerts</Text>
+            {currentProcess.riskFlags.map((risk) => (
+              <View key={risk.id} style={[
+                styles.riskCard,
+                risk.severity === 'high' && styles.riskCardHigh,
+                risk.severity === 'medium' && styles.riskCardMedium,
+                risk.severity === 'low' && styles.riskCardLow,
+              ]}>
+                <View style={styles.riskHeader}>
+                  <AlertCircle size={20} color={
+                    risk.severity === 'high' ? Colors.error :
+                    risk.severity === 'medium' ? Colors.warning :
+                    Colors.secondary
+                  } />
+                  <Text style={styles.riskMessage}>{risk.message}</Text>
+                </View>
+                <Text style={styles.riskExplanation}>{risk.explanation}</Text>
+                {risk.aiConfidence !== undefined && (
+                  <View style={styles.confidenceBadge}>
+                    <Text style={styles.confidenceText}>
+                      AI Confidence: {Math.round(risk.aiConfidence * 100)}%
+                    </Text>
+                  </View>
+                )}
+              </View>
+            ))}
+            <View style={styles.disclaimerCard}>
+              <Text style={styles.disclaimerTitle}>⚠️ Important Disclaimer</Text>
+              <Text style={styles.disclaimerText}>
+                This AI system provides guidance based on patterns and rules, but may not account for all edge cases or recent policy changes. Risk flags indicate areas of uncertainty. Always verify critical information and consult with a qualified professional when needed.
+              </Text>
+            </View>
           </View>
         )}
       </ScrollView>
@@ -451,5 +487,77 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: Colors.text.secondary,
+  },
+  riskSection: {
+    marginBottom: 24,
+  },
+  riskCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+  },
+  riskCardHigh: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FCA5A5',
+  },
+  riskCardMedium: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FCD34D',
+  },
+  riskCardLow: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#BFDBFE',
+  },
+  riskHeader: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 8,
+  },
+  riskMessage: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.text.primary,
+    lineHeight: 20,
+  },
+  riskExplanation: {
+    fontSize: 13,
+    color: Colors.text.secondary,
+    lineHeight: 18,
+    marginLeft: 32,
+  },
+  confidenceBadge: {
+    marginTop: 8,
+    marginLeft: 32,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: Colors.background,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  confidenceText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Colors.text.secondary,
+  },
+  disclaimerCard: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+    marginTop: 8,
+  },
+  disclaimerTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.text.primary,
+    marginBottom: 8,
+  },
+  disclaimerText: {
+    fontSize: 12,
+    color: Colors.text.secondary,
+    lineHeight: 18,
   },
 });

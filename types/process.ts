@@ -1,3 +1,60 @@
+export type PersonaType = 'self' | 'parent' | 'caregiver' | 'proxy';
+
+export interface Persona {
+  type: PersonaType;
+  name: string;
+  relationship?: string;
+  authorized: boolean;
+}
+
+export interface WorkflowNode {
+  id: string;
+  type: 'question' | 'document' | 'field' | 'validation' | 'decision';
+  label: string;
+  completed: boolean;
+  required: boolean;
+  dependsOn?: string[];
+  conditions?: NodeCondition[];
+  metadata?: Record<string, unknown>;
+}
+
+export interface NodeCondition {
+  field: string;
+  operator: 'equals' | 'contains' | 'greater' | 'less';
+  value: string;
+  explanation: string;
+}
+
+export interface ExplainWhy {
+  triggerId: string;
+  reason: string;
+  ruleSource: string;
+  confidence: number;
+  timestamp: string;
+}
+
+export interface RiskFlag {
+  id: string;
+  category: 'eligibility' | 'policy' | 'ai_confidence' | 'missing_data';
+  severity: 'low' | 'medium' | 'high';
+  message: string;
+  explanation: string;
+  aiConfidence?: number;
+}
+
+export interface ImpactMetrics {
+  estimatedTimeSavedHours: number;
+  errorReductionPercent: number;
+  estimatedCostSaved: number;
+  comparisonToManual: string;
+}
+
+export interface DataExpiry {
+  enabled: boolean;
+  expiryDate?: string;
+  autoDeleteAfterDays?: number;
+}
+
 export interface Process {
   id: string;
   type: string;
@@ -12,6 +69,13 @@ export interface Process {
   documents: ProcessDocument[];
   validationIssues: ValidationIssue[];
   checklistItems: ChecklistItem[];
+  workflowGraph: WorkflowNode[];
+  persona: Persona;
+  explainWhyLog: ExplainWhy[];
+  riskFlags: RiskFlag[];
+  impactMetrics: ImpactMetrics;
+  dataExpiry: DataExpiry;
+  voiceEnabled: boolean;
 }
 
 export interface FormField {
@@ -25,6 +89,9 @@ export interface FormField {
   validationMessage?: string;
   options?: string[];
   extractedFrom?: string;
+  confidence?: number;
+  triggeredBy?: string;
+  explanation?: string;
 }
 
 export interface ProcessDocument {
@@ -35,6 +102,8 @@ export interface ProcessDocument {
   uploadedAt: string;
   parsed: boolean;
   extractedData?: Record<string, unknown>;
+  confidence?: number;
+  riskFlags?: string[];
 }
 
 export interface ValidationIssue {
@@ -43,6 +112,9 @@ export interface ValidationIssue {
   severity: 'error' | 'warning' | 'info';
   message: string;
   suggestion?: string;
+  ruleSource?: string;
+  confidence?: number;
+  explanation?: string;
 }
 
 export interface ChecklistItem {

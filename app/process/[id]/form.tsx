@@ -10,14 +10,17 @@ export default function FormScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { currentProcess, updateField, validateProcess } = useProcess();
 
+  const fieldsLength = currentProcess?.fields.length || 0;
+  const fieldsData = JSON.stringify(currentProcess?.fields.map(f => ({ id: f.id, value: f.value })));
+
   useEffect(() => {
-    if (currentProcess && currentProcess.id === id && currentProcess.fields.length > 0) {
+    if (currentProcess && currentProcess.id === id && fieldsLength > 0) {
       const timer = setTimeout(() => {
         validateProcess(id);
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [currentProcess?.fields, id, validateProcess, currentProcess]);
+  }, [fieldsData, id, fieldsLength, currentProcess, validateProcess]);
 
   if (!currentProcess || currentProcess.id !== id) {
     return (
