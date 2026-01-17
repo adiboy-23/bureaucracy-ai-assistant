@@ -13,10 +13,10 @@ export default function ProcessDetailScreen() {
 
   useEffect(() => {
     const process = processes.find(p => p.id === id);
-    if (process) {
+    if (process && (!currentProcess || currentProcess.id !== id)) {
       setCurrentProcess(process);
     }
-  }, [id, processes, setCurrentProcess]);
+  }, [id, processes]);
 
   if (!currentProcess || currentProcess.id !== id) {
     return (

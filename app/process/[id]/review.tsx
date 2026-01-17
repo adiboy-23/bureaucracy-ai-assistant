@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CheckCircle2, AlertCircle, AlertTriangle, Info, Download, ArrowLeft } from 'lucide-react-native';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Colors from '@/constants/colors';
@@ -10,12 +10,20 @@ export default function ReviewScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { currentProcess, validateProcess, completeChecklistItem, updateProcess } = useProcess();
+  const lastValidatedIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (currentProcess && currentProcess.id === id) {
-      validateProcess(id);
+    // Reset validation tracking when id changes
+    if (lastValidatedIdRef.current !== null && lastValidatedIdRef.current !== id) {
+      lastValidatedIdRef.current = null;
     }
-  }, [currentProcess, id, validateProcess]);
+    
+    // Only validate if we have a process matching the id and haven't validated this id yet
+    if (currentProcess && currentProcess.id === id && lastValidatedIdRef.current !== id) {
+      validateProcess(id);
+      lastValidatedIdRef.current = id;
+    }
+  }, [id, currentProcess?.id]);
 
   if (!currentProcess || currentProcess.id !== id) {
     return (
